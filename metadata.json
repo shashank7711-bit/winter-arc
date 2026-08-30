@@ -1,0 +1,6 @@
+{
+  "name": "Winter Arc Tracker",
+  "description": "A personal daily-discipline tracker for a 5-month self-discipline challenge.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
