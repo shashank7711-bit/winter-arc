@@ -1,11 +1,18 @@
 export interface DailyLog {
-  date: string;
-  wakeup: boolean;
-  workout: boolean;
-  outreach: boolean;
-  reading: boolean;
-  diet: boolean;
-  notes: string;
+  date: string; // "YYYY-MM-DD"
+  workoutDone: boolean;
+  workoutType: string;
+  outreachDone: boolean;
+  outreachCount: number;
+  waterOnly: boolean;
+  noJunkFood: boolean;
+  sleepHours: number;
+  noPhoneDuringMeals: boolean;
+  stepsHit10k: boolean;
+  outside20min: boolean;
+  gratitudeNote: string;
+  dailyWins: string[]; // up to 5 entries
+  streak: number;
   userId?: string;
 }
 

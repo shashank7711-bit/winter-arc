@@ -63,7 +63,7 @@ export function Settings() {
       };
 
       const headers = [
-        "Date", "Wake Up Before 5AM", "Workout", "Outreach", "Read 10 Pages", "Clean Diet", "Notes"
+        "Date", "Workout", "Workout Type", "Outreach", "Outreach Count", "Water Only", "No Junk Food", "Sleep Hours", "No Phone During Meals", "Hit 10k Steps", "Outside 20 Min", "Gratitude Note", "Daily Wins"
       ];
       
       const csvRows = [];
@@ -72,12 +72,18 @@ export function Settings() {
       logs.forEach(log => {
         csvRows.push([
           log.date,
-          log.wakeup ? "Yes" : "No",
-          log.workout ? "Yes" : "No",
-          log.outreach ? "Yes" : "No",
-          log.reading ? "Yes" : "No",
-          log.diet ? "Yes" : "No",
-          escapeCSV(log.notes)
+          log.workoutDone ? "Yes" : "No",
+          escapeCSV(log.workoutType),
+          log.outreachDone ? "Yes" : "No",
+          log.outreachCount,
+          log.waterOnly ? "Yes" : "No",
+          log.noJunkFood ? "Yes" : "No",
+          log.sleepHours,
+          log.noPhoneDuringMeals ? "Yes" : "No",
+          log.stepsHit10k ? "Yes" : "No",
+          log.outside20min ? "Yes" : "No",
+          escapeCSV(log.gratitudeNote),
+          escapeCSV(log.dailyWins ? log.dailyWins.join('; ') : '')
         ].join(','));
       });
 

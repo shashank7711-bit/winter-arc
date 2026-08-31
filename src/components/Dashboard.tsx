@@ -99,7 +99,7 @@ export function Dashboard() {
     Object.values(logs).forEach((log: DailyLog) => {
       const date = new Date(log.date + 'T00:00:00');
       const month = date.getMonth();
-      const isSuccess = log.workout && log.outreach;
+      const isSuccess = log.workoutDone && log.outreachDone;
       
       if (isSuccess) {
         const target = data.find(d => d.month === month);
