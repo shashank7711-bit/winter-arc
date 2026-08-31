@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { fetchSettings, saveSettingsToDb, defaultSettings } from '../lib/db';
+import { fetchSettings, saveSettingsToDb, defaultSettings, fetchLogs } from '../lib/db';
 import { Settings as SettingsType } from '../types';
-import { Bell, Info } from 'lucide-react';
+import { Bell, Info, Download } from 'lucide-react';
 
 export function Settings() {
   const [settings, setSettings] = useState<SettingsType>(defaultSettings);
@@ -42,6 +42,60 @@ export function Settings() {
       <div className={`w-4 h-4 rounded-full bg-black transition-transform ${checked ? 'translate-x-6' : 'translate-x-0'}`} />
     </div>
   );
+
+  const handleDownloadCSV = async () => {
+    try {
+      const logsMap = await fetchLogs();
+      const logs = Object.values(logsMap).sort((a, b) => a.date.localeCompare(b.date));
+      
+      if (logs.length === 0) {
+        alert("No history to download.");
+        return;
+      }
+
+      const escapeCSV = (str: any) => {
+        if (str === null || str === undefined) return '""';
+        const stringified = String(str);
+        if (stringified.includes(',') || stringified.includes('"') || stringified.includes('\n')) {
+          return `"${stringified.replace(/"/g, '""')}"`;
+        }
+        return stringified;
+      };
+
+      const headers = [
+        "Date", "Wake Up Before 5AM", "Workout", "Outreach", "Read 10 Pages", "Clean Diet", "Notes"
+      ];
+      
+      const csvRows = [];
+      csvRows.push(headers.join(','));
+
+      logs.forEach(log => {
+        csvRows.push([
+          log.date,
+          log.wakeup ? "Yes" : "No",
+          log.workout ? "Yes" : "No",
+          log.outreach ? "Yes" : "No",
+          log.reading ? "Yes" : "No",
+          log.diet ? "Yes" : "No",
+          escapeCSV(log.notes)
+        ].join(','));
+      });
+
+      const csvString = csvRows.join('\n');
+      const blob = new Blob([csvString], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `winter-arc-history-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to download CSV:", err);
+      alert("Failed to download history.");
+    }
+  };
 
   if (loading) return (
     <div className="flex justify-center items-center h-64">
@@ -140,26 +194,23 @@ export function Settings() {
         </div>
       </div>
 
-      <button 
-        onClick={handleSave}
-        disabled={saving}
-        className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold uppercase tracking-widest p-4 rounded-xl transition-colors mt-4 disabled:opacity-50"
-      >
-        {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Settings'}
-      </button>
+      <div className="space-y-4 pt-4">
+        <button 
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold uppercase tracking-widest p-4 rounded-xl transition-colors disabled:opacity-50"
+        >
+          {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Settings'}
+        </button>
 
-      <button 
-        onClick={() => {
-          import('firebase/auth').then(({ signOut }) => {
-            import('../lib/firebase').then(({ auth }) => {
-              signOut(auth);
-            });
-          });
-        }}
-        className="w-full bg-red-950/50 hover:bg-red-950 text-red-500 font-bold uppercase tracking-widest p-4 rounded-xl transition-colors mt-4 border border-red-900/50"
-      >
-        Sign Out
-      </button>
+        <button 
+          onClick={handleDownloadCSV}
+          className="w-full bg-black hover:bg-zinc-900 border border-zinc-800 text-yellow-500 font-bold tracking-widest p-4 rounded-xl transition-colors flex items-center justify-center space-x-2"
+        >
+          <Download className="w-5 h-5" />
+          <span>Download History (CSV)</span>
+        </button>
+      </div>
     </div>
   );
 }

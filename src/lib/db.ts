@@ -1,7 +1,16 @@
 import { doc, getDoc, setDoc, collection, getDocs, query, where, orderBy, deleteDoc } from 'firebase/firestore';
-import { db, auth } from './firebase';
+import { db } from './firebase';
 import { DailyLog, Settings } from '../types';
 import { format, subDays } from 'date-fns';
+
+const PERSONAL_USER_ID = 'personal-user';
+
+const withTimeout = <T>(promise: Promise<T>, ms: number = 2500): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Firestore request timed out')), ms))
+  ]);
+};
 
 export const defaultSettings: Settings = {
   email: '',
@@ -51,56 +60,62 @@ export const getEmptyLog = (dateStr: string): DailyLog => {
 // We store logs directly in dailyLogs collection, docId = YYYY-MM-DD.
 // We also add userId to the document to allow for security rules.
 export const fetchLogs = async (): Promise<Record<string, DailyLog>> => {
-  const user = auth.currentUser;
-  if (!user) return {};
-  
-  const q = query(collection(db, 'dailyLogs'), where('userId', '==', user.uid));
-  const snap = await getDocs(q);
-  const logs: Record<string, DailyLog> = {};
-  snap.forEach(doc => {
-    logs[doc.id] = doc.data() as DailyLog;
-  });
-  return logs;
+  try {
+    const q = query(collection(db, 'dailyLogs'), where('userId', '==', PERSONAL_USER_ID));
+    const snap = await withTimeout(getDocs(q));
+    const logs: Record<string, DailyLog> = {};
+    snap.forEach(doc => {
+      logs[doc.id] = doc.data() as DailyLog;
+    });
+    return logs;
+  } catch (error) {
+    console.warn("Firebase warning (logs): DB might not be created or offline.", error);
+    return {};
+  }
 };
 
 export const fetchLog = async (dateStr: string): Promise<DailyLog> => {
-  const user = auth.currentUser;
-  if (!user) return getEmptyLog(dateStr);
-  
-  const docRef = doc(db, 'dailyLogs', dateStr);
-  const snap = await getDoc(docRef);
-  if (snap.exists() && snap.data().userId === user.uid) {
-    return snap.data() as DailyLog;
+  try {
+    const docRef = doc(db, 'dailyLogs', dateStr);
+    const snap = await withTimeout(getDoc(docRef));
+    if (snap.exists() && snap.data().userId === PERSONAL_USER_ID) {
+      return snap.data() as DailyLog;
+    }
+  } catch (error) {
+    console.warn("Firebase warning (log): DB might not be created or offline.", error);
   }
   return getEmptyLog(dateStr);
 };
 
 export const saveLogToDb = async (log: DailyLog) => {
-  const user = auth.currentUser;
-  if (!user) return;
-  
-  const docRef = doc(db, 'dailyLogs', log.date);
-  await setDoc(docRef, { ...log, userId: user.uid }, { merge: true });
+  try {
+    const docRef = doc(db, 'dailyLogs', log.date);
+    await withTimeout(setDoc(docRef, { ...log, userId: PERSONAL_USER_ID }, { merge: true }));
+  } catch (error) {
+    console.warn("Firebase warning (saveLog): DB might not be created or offline.", error);
+  }
 };
 
 export const fetchSettings = async (): Promise<Settings> => {
-  const user = auth.currentUser;
-  if (!user) return defaultSettings;
-  
-  const docRef = doc(db, 'settings', 'reminders');
-  const snap = await getDoc(docRef);
-  if (snap.exists() && snap.data().userId === user.uid) {
-    return snap.data() as Settings;
+  try {
+    const docRef = doc(db, 'settings', 'reminders');
+    const snap = await withTimeout(getDoc(docRef));
+    if (snap.exists() && snap.data().userId === PERSONAL_USER_ID) {
+      return snap.data() as Settings;
+    }
+  } catch (error) {
+    console.warn("Firebase warning (settings): DB might not be created or offline.", error);
   }
   return defaultSettings;
 };
 
 export const saveSettingsToDb = async (settings: Settings) => {
-  const user = auth.currentUser;
-  if (!user) return;
-  
-  const docRef = doc(db, 'settings', 'reminders');
-  await setDoc(docRef, { ...settings, userId: user.uid }, { merge: true });
+  try {
+    const docRef = doc(db, 'settings', 'reminders');
+    await withTimeout(setDoc(docRef, { ...settings, userId: PERSONAL_USER_ID }, { merge: true }));
+  } catch (error) {
+    console.warn("Firebase warning (saveSettings): DB might not be created or offline.", error);
+  }
 };
 
 export const calculateCurrentStreak = async (targetDateStr: string = format(new Date(), 'yyyy-MM-dd')): Promise<number> => {

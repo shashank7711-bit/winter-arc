@@ -1,8 +1,20 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { format, subDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth } from 'date-fns';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Quote } from 'lucide-react';
 import { fetchLogs, calculateCurrentStreak } from '../lib/db';
 import { DailyLog } from '../types';
+
+const QUOTES = [
+  { text: "Discipline equals freedom.", author: "Jocko Willink" },
+  { text: "We must all suffer from one of two pains: the pain of discipline or the pain of regret.", author: "Jim Rohn" },
+  { text: "First we make our habits, then our habits make us.", author: "Charles C. Noble" },
+  { text: "Amateurs sit and wait for inspiration, the rest of us just get up and go to work.", author: "Stephen King" },
+  { text: "The successful warrior is the average man, with laser-like focus.", author: "Bruce Lee" },
+  { text: "Do something today that your future self will thank you for.", author: "Sean Patrick Flanery" },
+  { text: "To achieve what 1% of the world's population has, you must be willing to do what only 1% dare to do.", author: "Manoj Arora" },
+  { text: "Motivation gets you going, but discipline keeps you growing.", author: "John C. Maxwell" }
+];
 
 export function Dashboard() {
   const today = new Date();
@@ -12,14 +24,25 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    Promise.all([
-      fetchLogs(),
-      calculateCurrentStreak(todayStr)
-    ]).then(([fetchedLogs, streak]) => {
-      setLogs(fetchedLogs);
-      setCurrentStreak(streak);
-      setLoading(false);
-    });
+    let mounted = true;
+    const loadData = async () => {
+      try {
+        const [allLogs, streak] = await Promise.all([
+          fetchLogs(),
+          calculateCurrentStreak(todayStr)
+        ]);
+        if (mounted) {
+          setLogs(allLogs);
+          setCurrentStreak(streak);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("Failed to load dashboard data:", error);
+        if (mounted) setLoading(false);
+      }
+    };
+    loadData();
+    return () => { mounted = false; };
   }, [todayStr]);
 
   const { thisWeekLogs, weekDays } = useMemo(() => {
@@ -62,6 +85,38 @@ export function Dashboard() {
     });
   }, [logs, todayStr]);
 
+  const fiveMonthData = useMemo(() => {
+    const arcMonths = [
+      { name: 'Oct', month: 9 },
+      { name: 'Nov', month: 10 },
+      { name: 'Dec', month: 11 },
+      { name: 'Jan', month: 0 },
+      { name: 'Feb', month: 1 }
+    ];
+    
+    const data = arcMonths.map(m => ({ name: m.name, month: m.month, successCount: 0 }));
+    
+    Object.values(logs).forEach((log: DailyLog) => {
+      const date = new Date(log.date + 'T00:00:00');
+      const month = date.getMonth();
+      const isSuccess = log.workout && log.outreach;
+      
+      if (isSuccess) {
+        const target = data.find(d => d.month === month);
+        if (target) {
+          target.successCount += 1;
+        }
+      }
+    });
+    return data;
+  }, [logs]);
+
+  const dailyQuote = useMemo(() => {
+    // Generate a deterministic index based on the date string (e.g., '2026-08-30')
+    const seed = todayStr.split('-').reduce((acc, part) => acc + parseInt(part), 0);
+    return QUOTES[seed % QUOTES.length];
+  }, [todayStr]);
+
   if (loading) return (
     <div className="flex justify-center items-center h-64">
       <div className="w-8 h-8 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
@@ -74,6 +129,15 @@ export function Dashboard() {
       <header className="space-y-1">
         <h1 className="text-3xl font-black tracking-tight text-white uppercase">Dashboard</h1>
       </header>
+
+      {/* Quote of the Day */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 relative overflow-hidden">
+        <Quote className="absolute -top-4 -right-4 w-24 h-24 text-yellow-500/10 transform rotate-12" />
+        <div className="relative z-10">
+          <p className="text-lg font-bold text-gray-200 leading-snug italic mb-3">"{dailyQuote.text}"</p>
+          <p className="text-sm font-bold text-yellow-500 uppercase tracking-widest">— {dailyQuote.author}</p>
+        </div>
+      </div>
 
       {/* Streak Counter */}
       <div className="flex flex-col items-center justify-center bg-yellow-500 rounded-3xl p-8 shadow-[0_0_40px_rgba(234,179,8,0.3)]">
@@ -118,6 +182,26 @@ export function Dashboard() {
         <div className="bg-zinc-900 rounded-xl p-4 flex flex-col space-y-1">
           <span className="text-zinc-500 text-xs font-bold uppercase tracking-wider">Total Logs</span>
           <span className="text-3xl font-black text-white">{Object.keys(logs).length}</span>
+        </div>
+      </div>
+
+      {/* Winter Arc 5-Month Progress Chart */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Winter Arc Progress (5 Months)</h2>
+        <div className="bg-zinc-900 rounded-xl p-4 h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={fiveMonthData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+              <XAxis dataKey="name" stroke="#71717a" fontSize={12} tickLine={false} axisLine={false} />
+              <YAxis stroke="#71717a" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+              <Tooltip 
+                contentStyle={{ backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: '8px' }}
+                itemStyle={{ color: '#eab308' }}
+                cursor={{ fill: '#27272a' }}
+              />
+              <Bar dataKey="successCount" name="Successful Days" fill="#eab308" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
